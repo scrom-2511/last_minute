@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { returnError } from "../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../helpers/return_calls/error_types.js";
+import { BusinessErrorType, ErrorType } from "../../helpers/return_calls/error_types.js";
 import { hashesToBytes } from "../../helpers/files/hash.js";
 import { FileMetadata } from "../../types/files.js";
 import { getPresignedUploadUrl } from "../../services/s3/presinged_urls.js";
@@ -9,6 +9,7 @@ import { returnSuccess } from "../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../helpers/return_calls/status_codes.js";
 import { createPendingUploads, deletePendingUploads } from "../../services/redis/pending_uploads.js";
 import { createFile, deleteFile } from "../../database/files.js";
+import { checkHackathonDeadlineExceeded } from "../../helpers/hackathons/manager.js";
 
 const fileMetadataSchema: z.ZodType<FileMetadata> = z.object({
     name: z.string(),
@@ -21,6 +22,7 @@ const reqSchema = z.object({
     hashes: z.array(z.string()),
     fileId: z.string(),
     metadata: fileMetadataSchema,
+    hackathonId: z.string()
 })
 
 export const uploadFile = async (req: Request, res: Response) => {
@@ -33,7 +35,11 @@ export const uploadFile = async (req: Request, res: Response) => {
             return returnError(ErrorType.InvalidRequest, res);
         }
 
-        const { fileId, hashes, metadata } = parsed.data;
+        const { fileId, hashes, metadata, hackathonId } = parsed.data;
+
+        if (await checkHackathonDeadlineExceeded(hackathonId)) {
+            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
+        }
 
         const hashBytes = hashesToBytes(hashes);
 
