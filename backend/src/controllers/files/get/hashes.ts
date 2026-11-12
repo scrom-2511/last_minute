@@ -5,7 +5,7 @@ import { getFileHashes } from "../../../database/files.js";
 import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
 
-export const file_hashes = async (req: Request, res: Response) => {
+export const fileHashes = async (req: Request, res: Response) => {
     try {
         const fileId = req.query.fileId;
 
@@ -13,13 +13,13 @@ export const file_hashes = async (req: Request, res: Response) => {
             return returnError(ErrorType.InvalidRequest, res);
         }
 
-        const file_hashes = await getFileHashes(fileId as string);
+        const fileHashes = await getFileHashes(fileId as string);
 
-        if (!file_hashes) {
+        if (!fileHashes) {
             return returnError(ErrorType.ResourceNotFound, res);
         }
 
-        return returnSuccess(file_hashes, SuccessStatusCodes.Success, res);
+        return returnSuccess(fileHashes, SuccessStatusCodes.Success, res);
     } catch (error) {
         return returnError(ErrorType.InternalServerError, res);
     }
