@@ -3,12 +3,12 @@ import { z } from "zod";
 import { returnError } from "../../helpers/return_calls/error_return.js";
 import { ErrorType } from "../../helpers/return_calls/error_types.js";
 import { hashesToBytes } from "../../helpers/files/hash.js";
-import { create_file, delete_file } from "../../database/files.js";
 import { FileMetadata } from "../../types/files.js";
 import { getPresignedUploadUrl } from "../../services/s3/presinged_urls.js";
 import { returnSuccess } from "../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../helpers/return_calls/status_codes.js";
 import { createPendingUploads, deletePendingUploads } from "../../services/redis/pending_uploads.js";
+import { createFile, deleteFile } from "../../database/files.js";
 
 const fileMetadataSchema: z.ZodType<FileMetadata> = z.object({
     name: z.string(),
@@ -30,7 +30,7 @@ export const uploadFile = async (req: Request, res: Response) => {
         const parsed = reqSchema.safeParse(body);
 
         if (!parsed.success) {
-            return returnError(ErrorType.Invalid_Request, res);
+            return returnError(ErrorType.InvalidRequest, res);
         }
 
         const { fileId, hashes, metadata } = parsed.data;
@@ -38,13 +38,13 @@ export const uploadFile = async (req: Request, res: Response) => {
         const hashBytes = hashesToBytes(hashes);
 
         const [fileRes, urlsRes, pendingRes] = await Promise.allSettled([
-            create_file(fileId, hashBytes, metadata, req.teamId!),
+            createFile(fileId, hashBytes, metadata, req.teamId!),
             Promise.all(hashes.map(getPresignedUploadUrl)),
             createPendingUploads(fileId, hashes),
         ]);
 
         if (fileRes.status === "rejected" || urlsRes.status === "rejected" || pendingRes.status === "rejected") {
-            if (fileRes.status === "fulfilled") await delete_file(fileId).catch(console.error);
+            if (fileRes.status === "fulfilled") await deleteFile(fileId).catch(console.error);
             if (pendingRes.status === "fulfilled") await deletePendingUploads(fileId).catch(console.error);
             throw new Error();
         }
@@ -52,6 +52,6 @@ export const uploadFile = async (req: Request, res: Response) => {
         return returnSuccess(urlsRes.value as string[], SuccessStatusCodes.Created, res);
     } catch (error) {
         console.log(error);
-        return returnError(ErrorType.Internal_Server_Error, res);
+        return returnError(ErrorType.InternalServerError, res);
     }
 }

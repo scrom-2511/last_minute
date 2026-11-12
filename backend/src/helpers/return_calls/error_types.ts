@@ -1,33 +1,33 @@
 export enum ErrorType {
-    Invalid_Request,
-    Internal_Server_Error,
+    InvalidRequest,
+    InternalServerError,
     Unauthorized,
-    File_Not_Found,
+    FileNotFound,
 }
 
 export class ErrorTypeUtils {
     static getMessage(error: ErrorType): string {
         switch (error) {
-            case ErrorType.Invalid_Request:
+            case ErrorType.InvalidRequest:
                 return "Invalid request";
-            case ErrorType.Internal_Server_Error:
+            case ErrorType.InternalServerError:
                 return "Internal server error";
             case ErrorType.Unauthorized:
                 return "Unauthorized";
-            case ErrorType.File_Not_Found:
+            case ErrorType.FileNotFound:
                 return "File not found";
         }
     }
 
     static getStatusCode(error: ErrorType): number {
         switch (error) {
-            case ErrorType.Invalid_Request:
+            case ErrorType.InvalidRequest:
                 return 400;
-            case ErrorType.Internal_Server_Error:
+            case ErrorType.InternalServerError:
                 return 500;
             case ErrorType.Unauthorized:
                 return 401;
-            case ErrorType.File_Not_Found:
+            case ErrorType.FileNotFound:
                 return 404;
         }
     }
