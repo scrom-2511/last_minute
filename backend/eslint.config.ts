@@ -1,5 +1,7 @@
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
+import unusedImports from "eslint-plugin-unused-imports";
+import eslintConfigPrettier from "eslint-config-prettier/flat";
 
 export default [
     {
@@ -9,8 +11,9 @@ export default [
         },
         plugins: {
             "@typescript-eslint": tsPlugin,
+            "unused-imports": unusedImports,
         },
-        ignores: ["eslint.config.ts"],
+        ignores: ["eslint.config.ts", "dist", "node_modules"],
         rules: {
             "@typescript-eslint/naming-convention": [
                 "error",
@@ -30,6 +33,7 @@ export default [
                 {
                     selector: "parameter",
                     format: ["camelCase"],
+                    leadingUnderscore: "allow",
                 },
                 {
                     selector: "property",
@@ -39,7 +43,7 @@ export default [
                     selector: "objectLiteralProperty",
                     format: null,
                     filter: {
-                        regex: "^(Bucket|Key)$",
+                        regex: "^(Bucket|Key|UploadId|PartNumber|MultipartUpload|Parts|ContentLength|require_protocol)$",
                         match: true,
                     },
                 },
@@ -52,6 +56,17 @@ export default [
                     format: ["PascalCase"],
                 },
             ],
+            "unused-imports/no-unused-imports": "error",
+            "unused-imports/no-unused-vars": [
+                "warn",
+                {
+                    vars: "all",
+                    varsIgnorePattern: "^_",
+                    args: "after-used",
+                    argsIgnorePattern: "^_",
+                },
+            ],
         },
     },
+    eslintConfigPrettier,
 ];
