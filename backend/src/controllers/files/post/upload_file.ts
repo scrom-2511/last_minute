@@ -1,63 +1,66 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { BusinessErrorType, ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { hashesToBytes } from "../../../helpers/files/hash.js";
-import { FileMetadata } from "../../../types/files.js";
-import { getPresignedUploadUrl } from "../../../services/s3/presinged_urls.js";
+import { ErrorType } from "../../../helpers/return_calls/error_types.js";
 import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { createPendingUploads, deletePendingUploads } from "../../../services/redis/pending_uploads.js";
-import { createFile, deleteFile } from "../../../database/files.js";
-import { checkHackathonDeadlineExceeded } from "../../../helpers/hackathons/manager.js";
+import { initiateMultipartUpload } from "../../../services/s3/multipart_upload.js";
+import { generateMultipartPresignedUploadUrl } from "../../../services/s3/presinged_urls.js";
 
-const fileMetadataSchema: z.ZodType<FileMetadata> = z.object({
+const reqSchema = z.object({
+    hash: z.string(),
+    hackathonId: z.number(),
     name: z.string(),
     mimeType: z.string(),
     size: z.number(),
     extension: z.string(),
 });
 
-const reqSchema = z.object({
-    hashes: z.array(z.string()),
-    fileId: z.string(),
-    metadata: fileMetadataSchema,
-    hackathonId: z.string()
-})
-
 export const uploadFile = async (req: Request, res: Response) => {
     try {
-        const body = req.body;
-
-        const parsed = reqSchema.safeParse(body);
+        const parsed = reqSchema.safeParse(req.body);
 
         if (!parsed.success) {
             return returnError(ErrorType.InvalidRequest, res);
         }
 
-        const { fileId, hashes, metadata, hackathonId } = parsed.data;
+        const { hash, extension, hackathonId, mimeType, name, size } = parsed.data;
 
-        if (await checkHackathonDeadlineExceeded(hackathonId)) {
-            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
-        }
+        const CHUNK_SIZE = 10 * 1024 * 1024;
 
-        const hashBytes = hashesToBytes(hashes);
+        const totalParts = Math.ceil(size / CHUNK_SIZE);
 
-        const [fileRes, urlsRes, pendingRes] = await Promise.allSettled([
-            createFile(fileId, hashBytes, metadata, req.teamId!),
-            Promise.all(hashes.map(getPresignedUploadUrl)),
-            createPendingUploads(fileId, hashes),
-        ]);
+        // S3 hard limit. Also protects against a corrupt or tampered size.
+        if (totalParts > 10_000) return returnError(ErrorType.InvalidRequest, res);
 
-        if (fileRes.status === "rejected" || urlsRes.status === "rejected" || pendingRes.status === "rejected") {
-            if (fileRes.status === "fulfilled") await deleteFile(fileId).catch(console.error);
-            if (pendingRes.status === "fulfilled") await deletePendingUploads(fileId).catch(console.error);
-            throw new Error();
-        }
+        const uploadId = await initiateMultipartUpload(hash);
+        if (!uploadId) throw new Error("initiate failed");
 
-        return returnSuccess(urlsRes.value as string[], SuccessStatusCodes.Created, res);
+        // TODO: implement upsertFile
+        await upsertFile();
+
+        const urls = await Promise.all(
+            Array.from({ length: totalParts }, (_, i) => {
+                // Part numbers are 1-based for S3. We map array index `i` to `i + 1`.
+                const partNumber = i + 1;
+
+                // Signed length must match exactly or S3 rejects the PUT. Every part
+                // is CHUNK_SIZE except the last, which holds the remainder.
+                const contentLength =
+                    partNumber < totalParts ? CHUNK_SIZE : size - (totalParts - 1) * CHUNK_SIZE;
+
+                return generateMultipartPresignedUploadUrl(
+                    hash,
+                    uploadId,
+                    partNumber,
+                    contentLength,
+                );
+            }),
+        );
+
+        return returnSuccess(urls, SuccessStatusCodes.Created, res);
     } catch (error) {
-        console.log(error);
+        console.error(error);
         return returnError(ErrorType.InternalServerError, res);
     }
-}
+};
