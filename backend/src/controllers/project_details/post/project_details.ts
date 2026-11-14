@@ -1,10 +1,9 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { BusinessErrorType, ErrorType } from "../../../helpers/return_calls/error_types.js";
+import { ErrorType } from "../../../helpers/return_calls/error_types.js";
 import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { checkHackathonDeadlineExceeded } from "../../../helpers/hackathons/manager.js";
 import { addLinksToVerify } from "../../../services/bullmq/link_verifier/producer.js";
 import { SubmissionStatus } from "../../../types/project_details.js";
 import { statusEmitter } from "../../../services/events/status_emitter.js";
@@ -23,10 +22,6 @@ export const uploadProjectDetails = async (req: Request, res: Response) => {
         if (!parse.success) return returnError(ErrorType.InvalidRequest, res);
 
         const { name, description, links, hackathonId, projectId } = parse.data;
-
-        // Submissions and edits to project details are blocked once the deadline passes
-        if (await checkHackathonDeadlineExceeded(hackathonId))
-            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
 
         // TODO: implement upsertProjectDetails in database
         const savedProjectId = await upsertProjectDetails();

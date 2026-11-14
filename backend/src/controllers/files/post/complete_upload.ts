@@ -32,12 +32,11 @@ export const completeUpload = async (req: Request, res: Response) => {
 
         // Verify file version exists and belongs to requesting team
         // TODO: Implement getFileVersionFromUserIdAndHackathonId in database
-        const fileVersion = await getFileVersionFromUserIdAndHackathonId(req.userId, hackathonId);
+        const fileVersion = await getFileVersionFromUserIdAndHackathonId();
         if (!fileVersion) return returnError(ErrorType.ResourceNotFound, res);
 
         // Check if upload completion is within the grace period
-        if (await checkUploadGracePeriodExceeded(hackathonId, fileVersion.createdAt))
-            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
+        if (await checkUploadGracePeriodExceeded(hackathonId, fileVersion.createdAt)) return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
 
         // Sort parts ascending by PartNumber as required by S3 CompleteMultipartUpload spec
         const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
@@ -46,7 +45,7 @@ export const completeUpload = async (req: Request, res: Response) => {
         await completeMultipartUpload(fileHash, uploadId, sortedParts);
 
         // TODO: Implement markFileUploaded in database
-        await markFileUploaded(fileId);
+        await markFileUploaded();
 
         // Enqueue background processing job for content validation and preview generation
         await addFileToProcess({
@@ -61,7 +60,7 @@ export const completeUpload = async (req: Request, res: Response) => {
 
         // Update submission status to Checking and notify live listeners
         // TODO: Implement updateProjectSubmissionStatus in database
-        await updateProjectSubmissionStatus(fileId, SubmissionStatus.Checking);
+        await updateProjectSubmissionStatus();
         statusEmitter.emit(`project:${fileId}`, {
             projectId: fileId,
             status: SubmissionStatus.Checking,

@@ -32,14 +32,12 @@ export const resumeUpload = async (req: Request, res: Response) => {
 
         // Enforce deadline and grace policy: in-flight uploads that began before deadline
         // are allowed within the grace window, but rejected if beyond grace
-        if (await checkUploadGracePeriodExceeded(hackathonId, fileVersion.createdAt))
-            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
+        if (await checkUploadGracePeriodExceeded(hackathonId, fileVersion.createdAt)) return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
 
         // Ensures if file is already uploaded, then it should not be resumed, preventing
         // file corruption.
         // TODO: Implement fileAlreadyUploaded in database
-        if (fileAlreadyUploaded(fileVersion))
-            return returnError(ErrorType.FileAlreadyUploaded, res);
+        if (fileAlreadyUploaded(fileVersion)) return returnError(ErrorType.FileAlreadyUploaded, res);
 
         // TODO: Implement getPendingUploadParts in database
         const pendingUploadParts = await getPendingUploadParts(fileVersion.uploadId);

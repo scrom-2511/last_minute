@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { BusinessErrorType, ErrorType } from "../../../helpers/return_calls/error_types.js";
+import { ErrorType } from "../../../helpers/return_calls/error_types.js";
 import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
 import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
 import { initiateMultipartUpload } from "../../../services/s3/multipart_upload.js";
 import { generateMultipartPresignedUploadUrl } from "../../../services/s3/presinged_urls.js";
-import { checkHackathonDeadlineExceeded } from "../../../helpers/hackathons/manager.js";
 import { CHUNK_SIZE } from "../../../types/files.js";
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB max file cap
@@ -30,10 +29,6 @@ export const uploadFile = async (req: Request, res: Response) => {
 
         // Reject uploads exceeding the 100 MB cap
         if (size > MAX_FILE_BYTES || size <= 0) return returnError(ErrorType.InvalidRequest, res);
-
-        // Reject new uploads initiated after the deadline
-        if (await checkHackathonDeadlineExceeded(hackathonId.toString()))
-            return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
 
         const totalParts = Math.ceil(size / CHUNK_SIZE);
 
