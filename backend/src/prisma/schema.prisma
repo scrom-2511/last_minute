@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Users {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teamMembers TeamMembers[]
+  organizers  Organizer[]
+}
+
+model Hackathons {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  location    String
+  isOnline    Boolean  @default(false)
+
+  teams        Teams[]
+  organizers   Organizer[]
+  lateAttempts LateAttempts[]
+}
+
+model Teams {
+  id          Int        @id @default(autoincrement())
+  hackathonId Int
+  hackathon   Hackathons @relation(fields: [hackathonId], references: [id])
+  name        String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  teamMembers  TeamMembers[]
+  project      Projects?
+  lateAttempts LateAttempts[]
+}
+
+model TeamMembers {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  team      Teams    @relation(fields: [teamId], references: [id])
+  memberId  Int
+  member    Users    @relation(fields: [memberId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, memberId])
+}
+
+enum SubmissionStatus {
+  uploading @map("uploading")
+  uploaded  @map("uploaded")
+  accepted  @map("accepted")
+  needsFix  @map("needsFix")
+  checking  @map("checking")
+  pending   @map("pending")
+}
+
+model Projects {
+  id               Int              @id @default(autoincrement())
+  teamId           Int              @unique
+  team             Teams            @relation(fields: [teamId], references: [id])
+  title            String?          @default("")
+  description      String?          @default("")
+  submissionStatus SubmissionStatus @default(pending)
+  fixDescription   String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  links Links[]
+  files Files?
+}
+
+model Files {
+  id             Int      @id @default(autoincrement())
+  projectId      Int      @unique
+  project        Projects @relation(fields: [projectId], references: [id])
+  currentVersion Int      @default(1)
+
+  versions FileVersions[]
+}
+
+enum FileStatus {
+  pending   @map("pending")
+  completed @map("completed")
+  needsFix  @map("needsFix")
+  checking  @map("checking")
+}
+
+enum Extension {
+  zip @map("zip")
+  pdf @map("pdf")
+}
+
+model FileVersions {
+  id           Int        @id @default(autoincrement())
+  name         String
+  extension    Extension
+  size         Int
+  version      Int        @default(1)
+  fileId       Int
+  file         Files      @relation(fields: [fileId], references: [id])
+  fileHash     String
+  uploadId     String
+  s3Key        String
+  rejectReason String?
+  status       FileStatus @default(pending)
+  createdAt    DateTime   @default(now())
+
+  @@unique([fileId, version])
+}
+
+enum LinkStatus {
+  accepted @map("accepted")
+  needsFix @map("needsFix")
+  pending  @map("pending")
+}
+
+model Links {
+  id           Int        @id @default(autoincrement())
+  projectId    Int
+  project      Projects   @relation(fields: [projectId], references: [id])
+  name         String
+  link         String
+  status       LinkStatus @default(pending)
+  rejectReason String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Organizer {
+  id          Int        @id @default(autoincrement())
+  hackathonId Int
+  hackathon   Hackathons @relation(fields: [hackathonId], references: [id])
+  userId      Int
+  user        Users      @relation(fields: [userId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model LateAttempts {
+  id          Int         @id @default(autoincrement())
+  hackathons  Hackathons? @relation(fields: [hackathonId], references: [id])
+  hackathonId Int?
+  teams       Teams?      @relation(fields: [teamId], references: [id])
+  teamId      Int?
+}
