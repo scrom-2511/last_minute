@@ -17,7 +17,7 @@ export interface CreateProjectParams extends UserHackathonParams {
 }
 
 export interface UpdateProjectSubmissionStatus extends UserHackathonParams {
-    fileId?: number;
+    fileId: number;
     projectId?: number;
     status: SubmissionStatus;
 }
@@ -40,5 +40,12 @@ export interface GetFileVersionFromUserIdAndHackathonIdParams extends UserHackat
 }
 
 export interface MarkFileUploadedParams extends UserHackathonParams {
-    fileVersionId: number;
+    fileId: number;
+    fileVersion: number;
+}
+
+export interface SetFileValidationFailedParams {
+    fileId: number;
+    fileVersion: number;
+    reason: string;
 }
