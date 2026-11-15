@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
-import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { getProjectSubmissionStatus } from "@/database/project.js";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { returnSuccess } from "@/helpers/return_calls/success_return";
+import { SuccessStatusCodes } from "@/helpers/return_calls/status_codes";
+import { getProjectSubmissionStatus } from "@/database/project";
 
 const querySchema = z.object({
     projectId: z.number(),

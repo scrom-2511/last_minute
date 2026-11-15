@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { ErrorType } from "@/helpers/return_calls/error_types";
 import { stringify } from "csv-stringify/sync";
-import { getSubmissionsForCsvExport } from "@/database/organizer.js";
+import { getSubmissionsForCsvExport } from "@/database/organizer";
 
 export const exportSubmissionsCsv = async (req: Request, res: Response) => {
     try {

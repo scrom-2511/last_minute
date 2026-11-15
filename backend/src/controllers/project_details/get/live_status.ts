@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { statusEmitter } from "../../../services/events/status_emitter.js";
-import { getProjectSubmissionStatus } from "@/database/project.js";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { statusEmitter } from "@/services/events/status_emitter";
+import { getProjectSubmissionStatus } from "@/database/project";
 
 const querySchema = z.object({
     projectId: z.coerce.number().int().positive(),

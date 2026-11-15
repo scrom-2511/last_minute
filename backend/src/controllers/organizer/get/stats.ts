@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { getOrganizerStats } from "@/database/organizer.js";
-import { statusEmitter } from "@/services/events/status_emitter.js";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { getOrganizerStats } from "@/database/organizer";
+import { statusEmitter } from "@/services/events/status_emitter";
 
 const querySchema = z.object({
     hackathonId: z.string().min(1),

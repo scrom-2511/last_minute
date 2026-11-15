@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
-import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { addLinksToVerify } from "../../../services/bullmq/link_verifier/producer.js";
-import { statusEmitter } from "../../../services/events/status_emitter.js";
-import { updateProjectSubmissionStatus, upsertProject } from "@/database/project.js";
-import { SubmissionStatus } from "@/prisma/generated/prisma/enums.js";
-import { getProjectsLinksToAdd } from "@/helpers/project_details/links.js";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { returnSuccess } from "@/helpers/return_calls/success_return";
+import { SuccessStatusCodes } from "@/helpers/return_calls/status_codes";
+import { addLinksToVerify } from "@/services/bullmq/link_verifier/producer";
+import { statusEmitter } from "@/services/events/status_emitter";
+import { updateProjectSubmissionStatus, upsertProject } from "@/database/project";
+import { SubmissionStatus } from "@/prisma/generated/prisma/enums";
+import { getProjectsLinksToAdd } from "@/helpers/project_details/links";
 
 const linkSchema = z.object({
     name: z.string().min(1),
@@ -40,16 +40,21 @@ export const uploadProjectDetails = async (req: Request, res: Response) => {
         const savedProject = await upsertProject({
             userId: req.userId,
             hackathonId: req.hackathonId,
-            links,
+            links: linksToAdd,
             title,
             description,
         });
 
+        const newLinksWithIds = savedProject.links.flatMap((link) =>
+            linksToAddArr.includes(link.link) ? [{ id: link.id, link: link.link }] : [],
+        );
+
         // Enqueue submitted URLs to BullMQ for SSRF and liveliness checking
-        if (linksToAddArr.length > 0) await addLinksToVerify(
-                linksToAddArr.map((link, i) => ({
-                    id: `${savedProject.id}-${i}`,
-                    link,
+        if (linksToAddArr.length > 0)
+            await addLinksToVerify(
+                newLinksWithIds.map((linkWithId) => ({
+                    id: linkWithId.id,
+                    link: linkWithId.link,
                 })),
             );
 

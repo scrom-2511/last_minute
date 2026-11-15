@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { getFileVersionFromUserIdAndHackathonId } from "@/database/files.js";
-import { fileAlreadyUploaded } from "@/helpers/files/uploads.js";
+import { getFileVersionFromUserIdAndHackathonId } from "@/database/files";
+import { fileAlreadyUploaded } from "@/helpers/files/uploads";
 import { ErrorType } from "@/helpers/return_calls/error_types";
 import { returnError } from "@/helpers/return_calls/error_return";
 import { returnSuccess } from "@/helpers/return_calls/success_return";
@@ -36,7 +36,8 @@ export const resumeUpload = async (req: Request, res: Response) => {
 
         // Ensures if file is already uploaded, then it should not be resumed, preventing
         // file corruption.
-        if (fileAlreadyUploaded(fileVersion)) return returnError(ErrorType.FileAlreadyUploaded, res);
+        if (fileAlreadyUploaded(fileVersion))
+            return returnError(ErrorType.FileAlreadyUploaded, res);
 
         const pendingUploadParts = await getPendingUploadParts(fileVersion);
 
