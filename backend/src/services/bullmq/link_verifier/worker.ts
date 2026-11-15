@@ -3,6 +3,7 @@ import { LINK_VERIFIER_QUEUE_NAME } from "../queues.js";
 import { LinkVerifierJob } from "../../../types/project_details.js";
 import { isLinkProper } from "../../../helpers/project_details/links.js";
 import { redisConnection } from "../redisClient.js";
+import { updateFailedLinks } from "@/database/project.js";
 
 const verifyLinks = new Worker(
     LINK_VERIFIER_QUEUE_NAME,
@@ -17,7 +18,6 @@ const verifyLinks = new Worker(
             result.status === "rejected" || !result.value ? [links[i].id] : [],
         );
 
-        // TODO: implement updateFailedLinks
         if (faultyIds.length > 0) await updateFailedLinks(faultyIds);
     },
     { connection: redisConnection, concurrency: 5 },

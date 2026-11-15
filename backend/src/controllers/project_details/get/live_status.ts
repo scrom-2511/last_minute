@@ -3,6 +3,7 @@ import { z } from "zod";
 import { returnError } from "../../../helpers/return_calls/error_return.js";
 import { ErrorType } from "../../../helpers/return_calls/error_types.js";
 import { statusEmitter } from "../../../services/events/status_emitter.js";
+import { getProjectSubmissionStatus } from "@/database/project.js";
 
 const querySchema = z.object({
     projectId: z.coerce.number().int().positive(),
@@ -15,8 +16,11 @@ export const streamLiveStatus = async (req: Request, res: Response) => {
 
     const { projectId } = parsed.data;
 
-    // TODO: Verify project belongs to authenticated team in database
-    const initialStatus = await getProjectSubmissionStatus();
+    const initialStatus = await getProjectSubmissionStatus({
+        projectId,
+        userId: Number(req.userId),
+        hackathonId: Number(req.hackathonId),
+    });
     if (!initialStatus) return returnError(ErrorType.ResourceNotFound, res);
 
     // Initialize SSE streaming headers

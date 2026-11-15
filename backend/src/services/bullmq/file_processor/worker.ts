@@ -12,6 +12,7 @@ import {
 import { downloadFromS3, uploadToS3 } from "../../s3/upload_download.js";
 import path from "node:path";
 import { redisConnection } from "../redisClient.js";
+import { setFileValidationFailed } from "@/database/files.js";
 
 const worker = new Worker(
     "process-file",
@@ -30,9 +31,8 @@ const worker = new Worker(
                 ? await processZipFile(filePath, fileId)
                 : await processPdfFile(filePath, fileId.toString());
 
-        // TODO: implement setFileValidationFailed
         // Abort processing and record failure if the file is invalid, corrupt, or hostile
-        if (!result.ok) return await setFileValidationFailed(fileId, result.reason);
+        if (!result.ok) return await setFileValidationFailed({ fileId, reason: result.reason });
 
         // Upload extracted preview (.md for zip, .png for pdf) to S3 for frontend display
         const previewFileName = `${fileId}-preview.${extension === "zip" ? "md" : "png"}`;

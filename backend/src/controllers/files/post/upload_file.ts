@@ -1,22 +1,24 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
-import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { initiateMultipartUpload } from "../../../services/s3/multipart_upload.js";
-import { generateMultipartPresignedUploadUrl } from "../../../services/s3/presinged_urls.js";
-import { CHUNK_SIZE } from "../../../types/files.js";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { CHUNK_SIZE } from "@/types/files";
+import { initiateMultipartUpload } from "@/services/s3/multipart_upload";
+import { upsertFileAndCreateNewFileVersion } from "@/database/files";
+import { SuccessStatusCodes } from "@/helpers/return_calls/status_codes";
+import { returnSuccess } from "@/helpers/return_calls/success_return";
+import { generateMultipartPresignedUploadUrl } from "@/services/s3/presinged_urls";
+import { Extension } from "@/prisma/generated/prisma/enums";
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB max file cap
 
 const reqSchema = z.object({
     hash: z.string(),
-    hackathonId: z.number(),
     name: z.string(),
     mimeType: z.string(),
     size: z.number(),
-    extension: z.string(),
+    fileId: z.string().optional(),
+    extension: z.enum(Extension),
 });
 
 export const uploadFile = async (req: Request, res: Response) => {
@@ -25,7 +27,7 @@ export const uploadFile = async (req: Request, res: Response) => {
 
         if (!parsed.success) return returnError(ErrorType.InvalidRequest, res);
 
-        const { hash, extension, hackathonId, mimeType, name, size } = parsed.data;
+        const { hash: fileHash, mimeType, name: fileName, size, extension } = parsed.data;
 
         // Reject uploads exceeding the 100 MB cap
         if (size > MAX_FILE_BYTES || size <= 0) return returnError(ErrorType.InvalidRequest, res);
@@ -35,15 +37,20 @@ export const uploadFile = async (req: Request, res: Response) => {
         // S3 hard limit. Also protects against a corrupt or tampered size.
         if (totalParts > 10_000) return returnError(ErrorType.InvalidRequest, res);
 
-        const uploadId = await initiateMultipartUpload(hash);
+        const uploadId = await initiateMultipartUpload(fileHash);
         if (!uploadId) throw new Error("initiate failed");
 
-        // TODO: implement upsertFile in database
-        const fileId = await upsertFile();
-
-        // Keep every version; create a new file version record in database
-        // TODO: Implement createNewFileVersion in database
-        const newVersion = await createNewFileVersion();
+        // Upsert file and create new file version
+        const file = await upsertFileAndCreateNewFileVersion({
+            fileHash,
+            extension: extension,
+            hackathonId: Number(req.hackathonId),
+            userId: Number(req.userId),
+            mimeType,
+            name: fileName,
+            size,
+            uploadId,
+        });
 
         const urls = await Promise.all(
             Array.from({ length: totalParts }, (_, i) => {
@@ -56,7 +63,7 @@ export const uploadFile = async (req: Request, res: Response) => {
                     partNumber < totalParts ? CHUNK_SIZE : size - (totalParts - 1) * CHUNK_SIZE;
 
                 return generateMultipartPresignedUploadUrl(
-                    hash,
+                    fileHash,
                     uploadId,
                     partNumber,
                     contentLength,
@@ -65,12 +72,11 @@ export const uploadFile = async (req: Request, res: Response) => {
         );
 
         return returnSuccess(
-            { fileId, uploadId, urls, version: newVersion },
+            { fileId: file.id, uploadId, urls, version: file.version },
             SuccessStatusCodes.Created,
             res,
         );
     } catch (error) {
-        console.error(error);
         return returnError(ErrorType.InternalServerError, res);
     }
 };

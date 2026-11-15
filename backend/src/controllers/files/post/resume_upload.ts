@@ -1,15 +1,16 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { returnError } from "../../../helpers/return_calls/error_return.js";
-import { BusinessErrorType, ErrorType } from "../../../helpers/return_calls/error_types.js";
-import { returnSuccess } from "../../../helpers/return_calls/success_return.js";
-import { SuccessStatusCodes } from "../../../helpers/return_calls/status_codes.js";
-import { CHUNK_SIZE } from "../../../types/files.js";
-import { generateMultipartPresignedUploadUrl } from "../../../services/s3/presinged_urls.js";
-import { checkUploadGracePeriodExceeded } from "../../../helpers/hackathons/manager.js";
+import { getFileVersionFromUserIdAndHackathonId } from "@/database/files.js";
+import { fileAlreadyUploaded } from "@/helpers/files/uploads.js";
+import { ErrorType } from "@/helpers/return_calls/error_types";
+import { returnError } from "@/helpers/return_calls/error_return";
+import { returnSuccess } from "@/helpers/return_calls/success_return";
+import { SuccessStatusCodes } from "@/helpers/return_calls/status_codes";
+import { generateMultipartPresignedUploadUrl } from "@/services/s3/presinged_urls";
+import { CHUNK_SIZE } from "@/types/files";
+import { getPendingUploadParts } from "@/helpers/files/s3";
 
 const reqSchema = z.object({
-    hackathonId: z.string(),
     fileHash: z.string(),
 });
 
@@ -18,11 +19,14 @@ export const resumeUpload = async (req: Request, res: Response) => {
         const parse = reqSchema.safeParse(req.body);
         if (!parse.success) return returnError(ErrorType.InvalidRequest, res);
 
-        const { fileHash, hackathonId } = parse.data;
+        const { fileHash } = parse.data;
 
         // Ensures that a user can only resume uploads belonging to their own team
-        // TODO: Implement getFileVersionFromUserIdAndHackathonId in database
-        const fileVersion = await getFileVersionFromUserIdAndHackathonId(req.userId, hackathonId);
+        const fileVersion = await getFileVersionFromUserIdAndHackathonId({
+            hackathonId: req.hackathonId!,
+            userId: req.userId!,
+            fileHash,
+        });
 
         if (!fileVersion) return returnError(ErrorType.ResourceNotFound, res);
 
@@ -30,17 +34,11 @@ export const resumeUpload = async (req: Request, res: Response) => {
         // different files would corrupt the final file.
         if (fileHash !== fileVersion.fileHash) return returnError(ErrorType.InvalidRequest, res);
 
-        // Enforce deadline and grace policy: in-flight uploads that began before deadline
-        // are allowed within the grace window, but rejected if beyond grace
-        if (await checkUploadGracePeriodExceeded(hackathonId, fileVersion.createdAt)) return returnError(BusinessErrorType.HackathonDeadlineExceeded, res);
-
         // Ensures if file is already uploaded, then it should not be resumed, preventing
         // file corruption.
-        // TODO: Implement fileAlreadyUploaded in database
         if (fileAlreadyUploaded(fileVersion)) return returnError(ErrorType.FileAlreadyUploaded, res);
 
-        // TODO: Implement getPendingUploadParts in database
-        const pendingUploadParts = await getPendingUploadParts(fileVersion.uploadId);
+        const pendingUploadParts = await getPendingUploadParts(fileVersion);
 
         const totalParts = Math.ceil(fileVersion.size / CHUNK_SIZE);
 
